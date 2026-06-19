@@ -1,0 +1,41 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: fady_ecommerce
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - dbdata:/var/lib/mysql
+    ports:
+      - '3306:3306'
+
+  backend:
+    build:
+      context: ./fady-ecommerce-backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./fady-ecommerce-backend:/var/www/html
+    depends_on:
+      - db
+    ports:
+      - '8000:8000'
+    environment:
+      DB_HOST: db
+      DB_DATABASE: fady_ecommerce
+      DB_USERNAME: root
+      DB_PASSWORD: root
+
+  frontend:
+    build:
+      context: ./fady-ecommerce-frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./fady-ecommerce-frontend:/app
+    ports:
+      - '5173:5173'
+    environment:
+      VITE_API_BASE: http://localhost:8000/api/v1
+
+volumes:
+  dbdata:
