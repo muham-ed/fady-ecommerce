@@ -1,35 +1,18 @@
 <?php
 
-use App\Http\Controllers\Api\Auth\LoginController;
-use App\Http\Controllers\Api\Auth\RegisterController;
-use App\Http\Controllers\Api\Admin\ProductManagementController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/register', [RegisterController::class, 'register']);
-Route::post('/login', [LoginController::class, 'login']);
+Route::prefix('v1')->group(function () {
+    Route::apiResource('products', App\Http\Controllers\Api\ProductController::class);
+    Route::apiResource('categories', App\Http\Controllers\Api\CategoryController::class);
+    Route::apiResource('orders', App\Http\Controllers\Api\OrderController::class)->only(['index','show','store']);
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [LoginController::class, 'logout']);
-});
+    // Auth routes (register/login) — token based for SPA (Sanctum)
+    Route::post('register', [App\Http\Controllers\Auth\RegisteredUserController::class, 'store']);
+    Route::post('login', [App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'store']);
+    Route::post('logout', [App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'destroy'])->middleware('auth:sanctum');
 
-use App\Http\Controllers\Api\PaymentController;
-
-// Payment routes
-Route::post('/payment/intent', [PaymentController::class, 'createIntent']);
-Route::post('/payment/webhook', [PaymentController::class, 'webhook']);
-
-use App\Http\Controllers\Api\Customer\ProductController as CustomerProductController;
-use App\Http\Controllers\Api\Customer\CartController as CustomerCartController;
-
-// Storefront API
-Route::get('/products', [CustomerProductController::class, 'index']);
-Route::get('/products/{slug}', [CustomerProductController::class, 'show']);
-
-Route::get('/cart', [CustomerCartController::class, 'index']);
-Route::post('/cart/add', [CustomerCartController::class, 'add']);
-Route::delete('/cart/remove/{id}', [CustomerCartController::class, 'remove']);
-Route::put('/cart/update/{id}', [CustomerCartController::class, 'update']);
-
-Route::middleware(['auth:sanctum','admin'])->prefix('admin')->group(function () {
-    Route::apiResource('products', ProductManagementController::class);
+    // Payments
+    Route::post('payments/checkout', [App\Http\Controllers\Api\PaymentController::class, 'createCheckoutSession']);
 });

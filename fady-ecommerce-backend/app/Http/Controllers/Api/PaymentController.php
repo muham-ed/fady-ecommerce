@@ -4,48 +4,45 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-# تشغيل الخادم الخلفي
-php artisan serve
+use Stripe\StripeClient;
+use App\Models\Order;
+use App\Models\Product;
 
-# Vite (إذا لم يكن يعمل)
-npm run dev
-
-# لتطبيق التغييرات على DB (تم تنفيذها بالفعل في جلسة العمل)
-php artisan migrate --force
-php artisan db:seed --class=DatabaseSeeder --force
 class PaymentController extends Controller
 {
-    /**
-     * Create a payment intent (uses Stripe if installed and configured)
-     */
-    public function createIntent(Request $request)
+    public function createCheckoutSession(Request $request)
     {
-        $stripeKey = config('services.stripe.key') ?? env('STRIPE_KEY');
-        $stripeSecret = config('services.stripe.secret') ?? env('STRIPE_SECRET');
+        $data = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
 
-        if (! $stripeKey || ! $stripeSecret) {
-            return response()->json(['message' => 'Payment gateway not configured'], 500);
+        $stripe = new StripeClient(env('STRIPE_SECRET'));
+
+        $line_items = [];
+        foreach ($data['items'] as $it) {
+            $product = Product::findOrFail($it['product_id']);
+            $line_items[] = [
+                'price_data' => [
+                    'currency' => env('APP_CURRENCY', 'usd'),
+                    'product_data' => [
+                        'name' => $product->name,
+                    ],
+                    'unit_amount' => intval($product->price * 100),
+                ],
+                'quantity' => $it['quantity'],
+            ];
         }
 
-        // If stripe/stripe-php is installed, create real payment intent. Otherwise return placeholder.
-        if (class_exists('\Stripe\Stripe')) {
-            \Stripe\Stripe::setApiKey($stripeSecret);
-            $amount = intval($request->input('amount', 1000));
-            $intent = \Stripe\PaymentIntent::create([
-                'amount' => $amount,
-                'currency' => $request->input('currency', 'usd'),
-            ]);
-            return response()->json(['client_secret' => $intent->client_secret]);
-        }
+        $session = $stripe->checkout->sessions->create([
+            'payment_method_types' => ['card'],
+            'line_items' => $line_items,
+            'mode' => 'payment',
+            'success_url' => env('APP_URL') . '/?success=1',
+            'cancel_url' => env('APP_URL') . '/?canceled=1',
+        ]);
 
-        return response()->json(['client_secret' => 'test_client_secret_placeholder']);
-    }
-
-    public function webhook(Request $request)
-    {
-        // Placeholder webhook handler. Implement signature verification when using Stripe.
-        $payload = $request->all();
-        // log or handle events
-        return response()->json(['received' => true]);
+        return response()->json(['id' => $session->id, 'url' => $session->url]);
     }
 }
