@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * موديل صور المنتج - منصة فادي
+ * Fady E-commerce Product Image Model
+ *
+ * @author     Mohamed Alaa <fady@example.com>
+ */
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;

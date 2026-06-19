@@ -1,54 +1,89 @@
 <?php
 
+/**
+ * نظام تسجيل الدخول - منصة فادي
+ * Fady E-commerce Login System
+ *
+ * هذا الكلاس مسؤول عن مصادقة المستخدمين (العملاء والإداريين)
+ * وإرجاع توكن API خاص بيهم عشان يستخدموا باقي الخدمات.
+ *
+ * @author     Mohamed Alaa <fady@example.com>
+ * @version    1.0.0
+ */
+
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
 {
     /**
-     * Login user and return API token.
+     * تسجيل دخول المستخدم
+     *
+     * أنا بستقبل الإيميل والباسورد، وبتحقق من صحتهم.
+     * لو صح، بحدث وقت آخر دخول وبعمل توكن جديد.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function login(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
+        // الخطوة 1: التحقق من صحة البيانات الواردة
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+        // الخطوة 2: البحث عن المستخدم في قاعدة البيانات
+        $user = User::where('email', $request->email)->first();
+
+        // الخطوة 3: التأكد من وجود المستخدم وتطابق كلمة المرور
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['بيانات الدخول غير صحيحة.'],
+            ]);
         }
 
-        $user = User::where('email', $request->input('email'))->first();
-
-        if (! $user || ! Hash::check($request->input('password'), $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+        // الخطوة 4: التأكد من أن الحساب نشط (مش موقف)
+        if (!$user->is_active) {
+            return response()->json([
+                'message' => 'الحساب موقف مؤقتاً، راجع فريق الدعم.',
+            ], 403);
         }
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        // الخطوة 5: تحديث وقت آخر دخول (عشان analytics)
+        $user->last_login_at = now();
+        $user->save();
 
+        // الخطوة 6: حذف أي توكنات قديمة (اختياري، عشان الأمان)
+        $user->tokens()->delete();
+
+        // الخطوة 7: إنشاء توكن جديد
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        // الخطوة 8: إرجاع الرد
         return response()->json([
+            'message' => 'تم تسجيل الدخول بنجاح! أهلاً بك في منصة فادي 🎉',
             'user' => $user,
             'token' => $token,
         ], 200);
     }
 
     /**
-     * Logout and revoke current access token.
+     * تسجيل الخروج (Logout)
+     * أنا بحذف التوكن الحالي عشان ينهي الجلسة.
      */
     public function logout(Request $request)
     {
-        $user = $request->user();
+        // حذف التوكن اللي المستخدم بيستخدمه حالياً
+        $request->user()->currentAccessToken()->delete();
 
-        if ($user && $request->user()->currentAccessToken()) {
-            $request->user()->currentAccessToken()->delete();
-        }
-
-        return response()->json(['message' => 'Logged out'], 200);
+        return response()->json([
+            'message' => 'تم تسجيل الخروج بنجاح. نراك قريباً! 👋',
+        ], 200);
     }
 }

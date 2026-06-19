@@ -4,15 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-# تشغيل الخادم الخلفي
-php artisan serve
 
-# Vite (إذا لم يكن يعمل)
-npm run dev
-
-# لتطبيق التغييرات على DB (تم تنفيذها بالفعل في جلسة العمل)
-php artisan migrate --force
-php artisan db:seed --class=DatabaseSeeder --force
 class PaymentController extends Controller
 {
     /**

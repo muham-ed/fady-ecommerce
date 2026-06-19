@@ -4,8 +4,6 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
-use App\Models\ProductImage;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -13,7 +11,7 @@ class ProductManagementController extends Controller
 {
     public function index(Request $request)
     {
-        $products = Product::paginate(25);
+        $products = Product::with(['category', 'images', 'variants'])->paginate(25);
         return response()->json($products);
     }
 
@@ -23,34 +21,22 @@ class ProductManagementController extends Controller
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:products,slug',
             'price' => 'required|numeric|min:0',
+            'category_id' => 'nullable|exists:categories,id',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $product = Product::create($request->only(['name','slug','price','description','is_active','category_id']));
+        $product = Product::create($request->only(['name','slug','price','category_id','is_active','description']));
 
-        // handle uploaded images
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
-                $path = $file->store('products', 'public');
-                $url = Storage::url($path);
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'image_url' => $url,
-                    'alt_text' => $product->name,
-                    'is_primary' => 0,
-                ]);
-            }
-        }
-
-        return response()->json($product->load('images'), 201);
+        return response()->json($product, 201);
     }
 
     public function show($id)
     {
-        $product = Product::findOrFail($id);
+        $product = Product::with(['category','images','variants'])->findOrFail($id);
         return response()->json($product);
     }
 
@@ -62,28 +48,17 @@ class ProductManagementController extends Controller
             'name' => 'sometimes|string|max:255',
             'slug' => 'sometimes|string|max:255|unique:products,slug,'.$product->id,
             'price' => 'sometimes|numeric|min:0',
+            'category_id' => 'nullable|exists:categories,id',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $product->update($request->only(['name','slug','price','description','is_active','category_id']));
+        $product->update($request->only(['name','slug','price','category_id','is_active','description']));
 
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
-                $path = $file->store('products', 'public');
-                $url = Storage::url($path);
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'image_url' => $url,
-                    'alt_text' => $product->name,
-                    'is_primary' => 0,
-                ]);
-            }
-        }
-
-        return response()->json($product->load('images'));
+        return response()->json($product);
     }
 
     public function destroy($id)
