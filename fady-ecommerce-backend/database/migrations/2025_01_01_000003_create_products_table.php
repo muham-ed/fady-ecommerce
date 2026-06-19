@@ -28,8 +28,9 @@ return new class extends Migration
 
             // العلاقة مع التصنيف (كل منتج يتبع تصنيف واحد)
             $table->foreignId('category_id')
+                ->nullable()
                 ->constrained()
-                ->restrictOnDelete(); // منع حذف التصنيف إذا كان عليه منتجات
+                ->nullOnDelete(); // عند حذف التصنيف، تُفرّغ العلاقة بدل منع الحذف
 
             // المعلومات الأساسية للمنتج
             $table->string('name', 200);
